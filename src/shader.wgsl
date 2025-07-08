@@ -1,35 +1,34 @@
 // Vertex shader
 
-struct Test {
-    ok : vec4<f32>,
-}
-
-@group(0) @binding(0)
-var<uniform> test : Test;
-
 struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) color: vec3<f32>,
+    @location(0) position: vec2<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) color: vec3<f32>,
+    @location(0) instance_idx: u32,
 };
 
 @vertex
 fn vs_main(
-    model: VertexInput,
-) -> VertexOutput {
+    @builtin(instance_index) instance_idx: u32,
+    in: VertexInput,
+) -> VertexOutput 
+{
     var out: VertexOutput;
-    out.color = model.color;
-    out.clip_position = vec4<f32>(model.position.x + test.ok.x, model.position.y + test.ok.y, model.position.z + test.ok.z, 1.0);
+    out.instance_idx = instance_idx;
+    // To get the horizontal and vertical offset we use bitshifts because they are more efficient,
+    // not sure if the compiler optimizes
+    out.clip_position = vec4<f32>(in.position.x + 0.03125*(f32(instance_idx & 63)), in.position.y - 0.0625*(f32(instance_idx >> 6)), 0.0, 1.0);
     return out;
 }
 
 // Fragment shader
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(in.color, 1.0);
+fn fs_main(
+    in: VertexOutput
+) -> @location(0) vec4<f32> 
+{
+    return vec4<f32>(0.000482*(f32(in.instance_idx)), 1.0, 0.0, 1.0);
 }

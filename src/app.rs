@@ -26,7 +26,7 @@ impl ApplicationHandler<State> for App {
         #[allow(unused_mut)]
         let mut window_attributes = Window::default_attributes();
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-        self.state = Some(pollster::block_on(State::new(window)).unwrap());
+        self.state = Some(State::new(window));
     }
 
     #[allow(unused_mut)]
@@ -48,11 +48,11 @@ impl ApplicationHandler<State> for App {
         
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => state.resize(PhysicalSize { 
+            WindowEvent::Resized(size) => state.renderer.resize(PhysicalSize { 
                 width: size.width, 
                 height: size.height }),
             WindowEvent::RedrawRequested => {
-                let _ = state.render();
+                let _ = state.renderer.render();
             }
             WindowEvent::KeyboardInput {
                 event:

@@ -1,5 +1,6 @@
 mod state;
 mod app;
+mod renderer;
 
 use std::{error::Error};
 use state::State;
