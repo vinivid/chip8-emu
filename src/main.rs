@@ -1,18 +1,17 @@
-mod state;
 mod app;
-mod renderer;
+mod gpu;
+mod cpu;
 
 use std::{error::Error};
-use state::State;
-use app::App;
+use app::{App, SimEvents};
 use winit::event_loop::EventLoop;
 
 fn run() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let event_loop : EventLoop<State> = EventLoop::with_user_event().build()?;
+    let event_loop : EventLoop<SimEvents> = EventLoop::with_user_event().build()?;
 
-    let mut app = App::new();
+    let mut app = App::new(event_loop.create_proxy());
     let _ = event_loop.run_app(&mut app);
 
     Ok(())

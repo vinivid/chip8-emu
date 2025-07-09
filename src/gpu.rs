@@ -5,7 +5,6 @@ use winit::{
     window::Window
 };
 
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
@@ -27,7 +26,7 @@ impl Vertex {
     }
 }
 
-pub struct Renderer {
+pub struct Gpu {
     surface : wgpu::Surface<'static>,
     device  : wgpu::Device,
     queue   : wgpu::Queue,
@@ -36,9 +35,10 @@ pub struct Renderer {
     vertex_buffer : wgpu::Buffer,
     index_buffer : wgpu::Buffer,
     num_indices : u32,
+    window : Arc<Window>
 }
 
-impl Renderer {
+impl Gpu {
     pub async fn new(window : Arc<Window>) -> anyhow::Result<Self> {
         let size= window.inner_size();
 
@@ -195,6 +195,7 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             num_indices,
+            window
         })
     }
 
