@@ -1,10 +1,10 @@
 use std::{iter::zip, sync::Arc};
 use winit::{
     window::Window,
-    event_loop::EventLoopProxy
 };
 use crate::gpu::Gpu;
-use crate::app::SimEvents;
+
+use std::{thread, time};
 
 struct Stack {
     top_index : usize,
@@ -40,7 +40,6 @@ pub struct Cpu {
     delay_timer: u8,
     sound_timer: u8, //What even is a sound timer?
     stack: Stack,
-    event_loop_proxy: EventLoopProxy<SimEvents>,
     pub gpu: Gpu
 }
 
@@ -73,7 +72,7 @@ impl Cpu {
         }
     }
     
-    pub fn new(window : Arc<Window>, event_loop_proxy : EventLoopProxy<SimEvents>) -> Self {
+    pub fn new(window : Arc<Window>) -> Self {
         let mut memory : [u8; 4096] = [0; 4096];
         let gpu = pollster::block_on(Gpu::new(Arc::clone(&window))).unwrap();
         Self::write_font(&mut memory);
@@ -86,7 +85,6 @@ impl Cpu {
             delay_timer: 0,
             sound_timer: 0,
             stack: Stack::new(),
-            event_loop_proxy,
             gpu
         }        
     }
@@ -104,7 +102,6 @@ impl Cpu {
             mem_addr += 1;
         }
 
-        let _ = self.event_loop_proxy.send_event(SimEvents::Process);
     }
 
     fn decode_and_execute(&mut self, instr : u16) {
@@ -116,13 +113,11 @@ impl Cpu {
                     //Clear screen - CLS
                     0x0000 => { 
                         self.gpu.clear_screen();
-                        let _ = self.event_loop_proxy.send_event(SimEvents::Process);
                     }
 
                     // Return - RET
                     0x000E => { 
                         self.pc = self.stack.pop();
-                        let _ = self.event_loop_proxy.send_event(SimEvents::Process);
                     }
                     _ => {println!("invalid instruction");}
                 }
@@ -131,6 +126,7 @@ impl Cpu {
             // jump - JP addr 
             0x1000 => { 
                 self.pc = instr & 0x0FFF;
+                //thread::sleep(time::Duration::from_millis(1000));
             }
 
             // load immediate - LD vx byte 
@@ -138,7 +134,6 @@ impl Cpu {
                 let vx = ((instr & 0x0F00) >> 8) as usize;
                 let immediate: u8 = (instr & 0x00FF) as u8;
                 self.reg[vx] = immediate; 
-                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
 
             // Add immdiate and save - ADD vx, nn
@@ -146,14 +141,12 @@ impl Cpu {
                 let vx: usize = ((instr & 0x0F00) >> 8) as usize;
                 let immediate: u8 = (instr & 0x00FF) as u8;
                 self.reg[vx] += immediate; 
-                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
 
             // load immediate to i - LD I, addr
             0xA000 => {
                 let immediate = instr & 0x0FFF;
                 self.i_reg = immediate;
-                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
 
             // Dxyn - DRW Vx, Vy, nibble
@@ -172,7 +165,6 @@ impl Cpu {
                 }
 
                 self.gpu.xor_sprite(pos_x, pos_y, sprite_vec);
-                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
 
 
@@ -188,8 +180,6 @@ impl Cpu {
         let right_8_bits = self.memory[(self.pc + 1) as usize] as u16;
         let instr: u16 = (left_8_bits << 8) | right_8_bits; 
         self.pc += 2;
-
-        println!("Current inst 0x{:X}", instr);
 
         Self::decode_and_execute(self, instr);
     }
