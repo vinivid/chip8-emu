@@ -4,18 +4,18 @@ mod cpu;
 
 use app::{App};
 use winit::{
-    event_loop::{ControlFlow, EventLoop}, 
+    event_loop::EventLoop, 
     platform::pump_events::{EventLoopExtPumpEvents, PumpStatus}
 };
 
 use std::process::ExitCode;
 use std::time::Duration;
+use std::thread;
 
 fn run() -> std::process::ExitCode {
     env_logger::init();
 
     let mut event_loop = EventLoop::builder().build().unwrap();
-    event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App::new();
     loop {
         let timeout = Some(Duration::ZERO);
@@ -31,6 +31,7 @@ fn run() -> std::process::ExitCode {
         };
 
         cpu.process();
+        thread::sleep(Duration::from_millis(16));
     }
 }
 

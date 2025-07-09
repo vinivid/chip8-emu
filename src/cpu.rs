@@ -4,8 +4,6 @@ use winit::{
 };
 use crate::gpu::Gpu;
 
-use std::{thread, time};
-
 struct Stack {
     top_index : usize,
     values : [u16; 16]
