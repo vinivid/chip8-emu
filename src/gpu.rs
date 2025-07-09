@@ -1,5 +1,5 @@
 use std::{sync::Arc};
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt};
 use winit::{
     dpi::PhysicalSize,
     window::Window
@@ -26,6 +26,30 @@ impl Vertex {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct PixelColor {
+    col: f32
+}
+
+impl PixelColor {
+    fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32
+                }
+            ]
+        }
+    }
+}
+
 pub struct Gpu {
     surface : wgpu::Surface<'static>,
     device  : wgpu::Device,
@@ -35,7 +59,9 @@ pub struct Gpu {
     vertex_buffer : wgpu::Buffer,
     index_buffer : wgpu::Buffer,
     num_indices : u32,
-    window : Arc<Window>
+    pub window : Arc<Window>,
+    pixel_array : [PixelColor; 2048],
+    pixel_buffer : wgpu::Buffer
 }
 
 impl Gpu {
@@ -114,7 +140,7 @@ impl Gpu {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"), 
-                buffers: &[Vertex::desc()], 
+                buffers: &[Vertex::desc(), PixelColor::desc()], 
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState { 
@@ -185,6 +211,15 @@ impl Gpu {
 
         let num_indices = INDICES.len() as u32;
 
+        let pixel_array : [PixelColor; 2048] = [PixelColor {col : 0.0}; 2048];
+
+        let pixel_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Pixel instances buffer"),
+                contents: bytemuck::cast_slice(&[pixel_array]),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            }
+        );
 
         Ok(Self {
             surface,
@@ -195,7 +230,9 @@ impl Gpu {
             vertex_buffer,
             index_buffer,
             num_indices,
-            window
+            window,
+            pixel_array,
+            pixel_buffer
         })
     }
 
@@ -241,6 +278,7 @@ impl Gpu {
             render_pass.set_pipeline(&self.render_pipeline);
 
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.pixel_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             // 2048 is the total number of pixels (64 x 32)
@@ -251,5 +289,29 @@ impl Gpu {
         output.present();
 
         Ok(())
+    }
+
+    pub fn clear_screen(&mut self) {
+        self.pixel_array = [PixelColor {col : 0.0}; 2048];
+        self.queue.write_buffer(&self.pixel_buffer, 0, bytemuck::cast_slice(&[self.pixel_array]));
+        self.window.request_redraw();
+    }
+
+    pub fn xor_sprite(&mut self, pos_x : usize, pos_y : usize, sprite_data : Vec<u8>) {
+        for (row, value) in sprite_data.iter().enumerate() {
+            for column in 0..8 {
+                if (value & (0x80 >> column)) != 0 {
+                    let pixel_at_position = self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col;
+                    if pixel_at_position > 0.3 {
+                        self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col = 0.0;
+                    } else {
+                        self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col = 1.0;
+                    }
+                }
+            }
+        }
+
+        self.queue.write_buffer(&self.pixel_buffer, 0, bytemuck::cast_slice(&[self.pixel_array]));
+        self.window.request_redraw();
     }
 }

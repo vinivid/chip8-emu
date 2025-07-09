@@ -107,22 +107,90 @@ impl Cpu {
         let _ = self.event_loop_proxy.send_event(SimEvents::Process);
     }
 
-    pub fn process(&mut self) {
-        let left_8_bits = self.memory[self.pc as usize];
-        let right_8_bits = self.memory[(self.pc + 1) as usize];
-        self.pc += 2;
-        println!("Pc advancing {}", self.pc);
+    fn decode_and_execute(&mut self, instr : u16) {
+        match instr & 0xF000 {
+            0x0000 => {
+                // Considering only the base chip8 instructions, only the
+                // last 4 bits matter for instructions with 0.
+                match instr & 0x000F {
+                    //Clear screen - CLS
+                    0x0000 => { 
+                        self.gpu.clear_screen();
+                        let _ = self.event_loop_proxy.send_event(SimEvents::Process);
+                    }
 
-        match left_8_bits & 0xF0 {
-            0 => {
-                println!("test");
+                    // Return - RET
+                    0x000E => { 
+                        self.pc = self.stack.pop();
+                        let _ = self.event_loop_proxy.send_event(SimEvents::Process);
+                    }
+                    _ => {println!("invalid instruction");}
+                }
+            }
+
+            // jump - JP addr 
+            0x1000 => { 
+                self.pc = instr & 0x0FFF;
+            }
+
+            // load immediate - LD vx byte 
+            0x6000 => {
+                let vx = ((instr & 0x0F00) >> 8) as usize;
+                let immediate: u8 = (instr & 0x00FF) as u8;
+                self.reg[vx] = immediate; 
                 let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
 
-            _ => {
-                println!("shit");
-                //let _ = self.event_loop_proxy.send_event(SimEvents::Process);
+            // Add immdiate and save - ADD vx, nn
+            0x7000 => {
+                let vx: usize = ((instr & 0x0F00) >> 8) as usize;
+                let immediate: u8 = (instr & 0x00FF) as u8;
+                self.reg[vx] += immediate; 
+                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
             }
-        }
+
+            // load immediate to i - LD I, addr
+            0xA000 => {
+                let immediate = instr & 0x0FFF;
+                self.i_reg = immediate;
+                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
+            }
+
+            // Dxyn - DRW Vx, Vy, nibble
+            0xD000 => {
+                let vx = ((instr & 0x0F00) >> 8) as usize;
+                let vy = ((instr & 0x00F0) >> 4) as usize;
+                let pos_x = self.reg[vx] as usize;
+                let pos_y= self.reg[vy] as usize;
+                let qtt = (instr & 0x000F) as usize;
+                let mut indexer = self.i_reg as usize;
+                let mut sprite_vec: Vec<u8> = Vec::new();
+
+                for _ in 0..qtt {
+                    sprite_vec.push(self.memory[indexer]);
+                    indexer += 1;
+                }
+
+                self.gpu.xor_sprite(pos_x, pos_y, sprite_vec);
+                let _ = self.event_loop_proxy.send_event(SimEvents::Process);
+            }
+
+
+
+            _ => {
+                println!("Invalid instruction");
+            }
+        } 
+    }
+
+    pub fn process(&mut self) {
+        let left_8_bits= self.memory[self.pc as usize] as u16;
+        let right_8_bits = self.memory[(self.pc + 1) as usize] as u16;
+        let instr: u16 = (left_8_bits << 8) | right_8_bits; 
+        self.pc += 2;
+
+        println!("Current inst 0x{:X}", instr);
+
+        Self::decode_and_execute(self, instr);
     }
 }
