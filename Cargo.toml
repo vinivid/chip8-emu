@@ -3,11 +3,16 @@ name = "chip8_emu"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "chip8"      
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = "1.0.98"
 bytemuck = "1.23.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 pollster = "0.4.0"
+rand = "0.9.1"
 wgpu = "25.0.2"
 winit = "0.30.11"

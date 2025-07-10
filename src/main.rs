@@ -1,8 +1,4 @@
-mod app;
-mod gpu;
-mod cpu;
-
-use app::{App};
+use chip8::{app::App};
 use winit::{
     event_loop::EventLoop, 
     platform::pump_events::{EventLoopExtPumpEvents, PumpStatus}
@@ -25,13 +21,10 @@ fn run() -> std::process::ExitCode {
             break ExitCode::from(exit_code as u8);
         }
 
-        let cpu = match &mut app.cpu {
-            Some(canvas) => canvas,
-            None => continue,
+        if let Some(arch) = &mut app.arch {
+            arch.emulate();
+            thread::sleep(Duration::from_millis(8));
         };
-
-        cpu.process();
-        thread::sleep(Duration::from_millis(16));
     }
 }
 

@@ -297,13 +297,15 @@ impl Gpu {
         self.window.request_redraw();
     }
 
-    pub fn xor_sprite(&mut self, pos_x : usize, pos_y : usize, sprite_data : Vec<u8>) {
+    pub fn xor_sprite(&mut self, pos_x : usize, pos_y : usize, sprite_data : Vec<u8>) -> bool {
+        let mut ret_flag = false;
         for (row, value) in sprite_data.iter().enumerate() {
             for column in 0..8 {
                 if (value & (0x80 >> column)) != 0 {
                     let pixel_at_position = self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col;
                     if pixel_at_position > 0.3 {
                         self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col = 0.0;
+                        ret_flag = true;
                     } else {
                         self.pixel_array[(pos_y+row)*64 + (column + pos_x)].col = 1.0;
                     }
@@ -313,5 +315,6 @@ impl Gpu {
 
         self.queue.write_buffer(&self.pixel_buffer, 0, bytemuck::cast_slice(&[self.pixel_array]));
         self.window.request_redraw();
+        ret_flag
     }
 }
